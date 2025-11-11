@@ -1,6 +1,6 @@
 use crate::tensor::Tensor;
 
-pub(crate) trait Module {
+pub trait Module {
 
     //perform forward pass
     fn forward(&self, input: &Tensor) -> Tensor;
