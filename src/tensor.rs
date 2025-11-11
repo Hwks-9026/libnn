@@ -55,12 +55,7 @@ pub fn add(&self, rhs: &Tensor) -> Tensor {
     let self_data = self.data.borrow();
     let rhs_data = rhs.data.borrow();
 
-    println!("--- ADDING ---");
-    dbg!(self_data.shape());
-    dbg!(rhs_data.shape());
-
     let result_data = &*self_data + &*rhs_data;
-    println!("--- SUCEEDED ---");
 
     // 2. PREPARE FOR BACKWARD PASS
     let self_grad_rc = self.gradient.clone();
@@ -123,12 +118,7 @@ pub fn add(&self, rhs: &Tensor) -> Tensor {
         let self_data = self.data.borrow();
         let rhs_data = rhs.data.borrow();
         
-        println!("--- SUBTRACTING ---");
-        dbg!(self_data.shape());
-        dbg!(rhs_data.shape());
-        
         let result_data = &*self_data - &*rhs_data;
-        println!("--- SUCEEDED ---");
         
         let self_grad_rc = self.gradient.clone();
         let rhs_grad_rc = rhs.gradient.clone();
