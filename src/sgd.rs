@@ -13,8 +13,8 @@ impl SGD {
     }
     pub fn step(&mut self) {
         for p in &self.parameters {
-            let grad = p.gradient.borrow();
-            let mut data = p.data.borrow_mut();
+            let grad = p.gradient.lock().unwrap();
+            let mut data = p.data.lock().unwrap();
 
             // Update rule: data = data - lr * grad
             data.scaled_add(-self.learning_rate, &*grad);
@@ -23,7 +23,7 @@ impl SGD {
 
     pub fn zero_grad(&self) {
         for p in &self.parameters {
-            p.gradient.borrow_mut().fill(0.0);
+            p.gradient.lock().unwrap().fill(0.0);
         }
     }
 }

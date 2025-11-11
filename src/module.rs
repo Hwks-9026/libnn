@@ -10,7 +10,7 @@ pub trait Module {
 
     fn zero_gradients(&self) {
         for p in self.parameters() {
-            p.gradient.borrow_mut().fill(0.0)
+            p.gradient.lock().unwrap().fill(0.0)
         }
     }
 }
