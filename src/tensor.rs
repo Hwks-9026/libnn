@@ -153,7 +153,7 @@ impl Tensor {
         let self_data = self.data.borrow();
         let rhs_data = rhs.data.borrow();
     
-        let result_data = &*self_data + &*rhs_data;
+        let result_data = &*self_data.dot(&*rhs_data);
 
         let self_data_rc = self.data.clone();
         let rhs_data_rc = rhs.data.clone();
@@ -178,7 +178,7 @@ impl Tensor {
         };
 
         Tensor {
-            data: Rc::new(RefCell::new(result_data)),
+            data: Rc::new(RefCell::new(result_data.to_owned())),
             gradient: c_grad_rc,
             _children: vec![self.clone(), rhs.clone()],
             _backward: Rc::new(RefCell::new(Some(Box::new(backward_op)))),
