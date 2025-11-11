@@ -17,7 +17,7 @@ impl SGD {
             let mut data = p.data.lock().unwrap();
 
             // Update rule: data = data - lr * grad
-            data.scaled_add(-self.learning_rate, &*grad);
+            data.scaled_add(self.learning_rate, &*grad);
         }
     }
 
