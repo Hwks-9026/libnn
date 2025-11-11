@@ -59,6 +59,7 @@ impl Tensor {
         dbg!(rhs_data.shape());
         
         let result_data = &*self_data + &*rhs_data;
+        println!("--- SUCEEDED ---");
         
         let self_grad_rc = self.gradient.clone();
         let rhs_grad_rc = rhs.gradient.clone();
@@ -87,6 +88,7 @@ impl Tensor {
         dbg!(rhs_data.shape());
         
         let result_data = &*self_data - &*rhs_data;
+        println!("--- SUCEEDED ---");
         
         let self_grad_rc = self.gradient.clone();
         let rhs_grad_rc = rhs.gradient.clone();
