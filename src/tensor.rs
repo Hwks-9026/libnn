@@ -3,11 +3,13 @@ use ndarray::arr0;
 use ndarray::linalg::Dot;
 use std::cell::RefCell;
 use std::rc::Rc;
+use std::collections::HashSet;
 
 use std::ops::*;
 
 type TensorData = Rc<RefCell<ArrayD<f32>>>;
 type GradientData = Rc<RefCell<ArrayD<f32>>>;
+type TensorId = *const RefCell<ArrayD<f32>>;
 
 #[derive(Clone)]
 pub struct Tensor {
@@ -48,7 +50,7 @@ impl Tensor {
 
 // Math Operations
 impl Tensor {
-    fn add(self, rhs: & Tensor) -> Tensor {
+    pub fn add(self, rhs: & Tensor) -> Tensor {
         let result_data = &*self.data.borrow() + &*rhs.data.borrow();
         
         let self_grad_rc = self.gradient.clone();
@@ -69,7 +71,7 @@ impl Tensor {
         }
     }
 
-    fn sub(self, rhs: &Tensor) -> Tensor {
+    pub fn sub(self, rhs: &Tensor) -> Tensor {
         let result_data = &*self.data.borrow() - &*rhs.data.borrow();
         
         let self_grad_rc = self.gradient.clone();
@@ -90,7 +92,7 @@ impl Tensor {
         }
     }
 
-    fn mul(self, rhs: &Tensor) -> Tensor {
+    pub fn mul(self, rhs: &Tensor) -> Tensor {
         let self_data_rc = self.data.clone();
         let rhs_data_rc = rhs.data.clone();
         
@@ -122,7 +124,6 @@ impl Tensor {
     }
 
     pub fn relu(&self) -> Tensor {
-
         let a_data = self.data.borrow();
         let result_data = a_data.mapv(|x| x.max(0.0));
         let positive_mask = a_data.mapv(|x| if x > 0.0 { 1.0 } else { 0.0 });
@@ -138,6 +139,7 @@ impl Tensor {
             let grad_update = &*c_grad * &positive_mask;
             a_grad_rc.borrow_mut().scaled_add(1.0, &grad_update);
         };
+
         Tensor {
             data: Rc::new(RefCell::new(result_data)),
             gradient: c_grad_rc,
@@ -151,7 +153,6 @@ impl Tensor {
         let self_data = self.data.borrow();
         let rhs_data = rhs.data.borrow();
     
-        // NOW use &* to get the &ArrayD<f32> for the operation
         let result_data = &*self_data + &*rhs_data;
 
         let self_data_rc = self.data.clone();
@@ -176,7 +177,6 @@ impl Tensor {
             rhs_grad_rc.borrow_mut().scaled_add(1.0, &b_grad_update);
         };
 
-        // 3. CREATE NEW TENSOR
         Tensor {
             data: Rc::new(RefCell::new(result_data)),
             gradient: c_grad_rc,
@@ -184,6 +184,7 @@ impl Tensor {
             _backward: Rc::new(RefCell::new(Some(Box::new(backward_op)))),
         }
     }
+
     pub fn powf(&self, n: f32) -> Tensor {
         let result_data = self.data.borrow().mapv(|x| x.powf(n));
         let self_data_rc = self.data.clone(); // Need original data for derivative
@@ -201,7 +202,6 @@ impl Tensor {
             self_grad_rc.borrow_mut().scaled_add(1.0, &grad_update);
         };
 
-        // 3. CREATE NEW TENSOR
         Tensor {
             data: Rc::new(RefCell::new(result_data)),
             gradient: c_grad_rc,
@@ -221,16 +221,11 @@ impl Tensor {
 
         let c_grad_rc_clone = c_grad_rc.clone();
         let backward_op = move || {
-            // Get the scalar gradient from the output
             let c_grad_scalar = c_grad_rc_clone.borrow()[[]];
             
             // The derivative is 1/N
             let grad_per_element = c_grad_scalar / n;
-            
-            // Create a new array of the *original* shape, filled with this grad
             let grad_update = ArrayD::from_elem(self_shape.clone(), grad_per_element);
-            
-            // Add this broadcasted gradient to the input's gradient
             self_grad_rc.borrow_mut().scaled_add(1.0, &grad_update);
         };
 
@@ -244,6 +239,48 @@ impl Tensor {
     }
 }
 
+//back propagation
+impl Tensor {
+
+    /// Performs backpropagation starting from this Tensor which is assumed to be the loss
+    pub fn backward(&self) {
+        // 1. Construct the topological sort
+        let mut topo: Vec<Tensor> = Vec::new();
+        let mut visited: HashSet<TensorId> = HashSet::new();
+        build_topo(self, &mut visited, &mut topo);
+
+        // 2. Initialize the gradient
+        // - Set d(loss)/d(loss) = 1.0
+        // - We use .fill() assuming the loss is a scalar (e.g., from .mean())
+        self.gradient.borrow_mut().fill(1.0);
+
+        // 3. Back propagation
+        for tensor in topo.iter().rev() {
+            // If the tensor has a backward op, call it
+            if let Some(backward_op) = tensor._backward.borrow().as_ref() {
+                backward_op();
+            }
+        }
+    }
+}
+
+
+//helper functions
+
 fn transpose(arr_d: &ArrayD<f32>) -> ArrayD<f32> {
     arr_d.view().into_dimensionality::<ndarray::Ix2>().unwrap().t().to_owned().into_dyn()
+}
+
+
+fn build_topo(tensor: &Tensor, visited: &mut HashSet<TensorId>, topo: &mut Vec<Tensor>) {
+    
+    let id = Rc::as_ptr(&tensor.data);
+    
+    if !visited.contains(&id) {
+        visited.insert(id);
+        for child in &tensor._children {
+            build_topo(child, visited, topo);
+        }
+        topo.push(tensor.clone());
+    }
 }
