@@ -2,7 +2,12 @@
 #![allow(unused)]
 #![allow(incomplete_features)]
 #![feature(inherent_associated_types)]
-mod tensor;
-mod module;
-mod sgd;
-mod layer;
+pub mod tensor;
+pub mod module;
+pub mod sgd;
+pub mod layer;
+
+pub use tensor::Tensor;
+pub use module::{Module};
+pub use layer::{Dense, ReLU, Sequential};
+pub use sgd::SGD;
