@@ -17,7 +17,7 @@ pub struct Tensor {
     _children: Vec<Tensor>,
     
     //for back propagation
-    _backward: Arc<Mutex<Option<Box<dyn Fn()>>>>
+    _backward: Arc<Mutex<Option<Box<dyn Fn() + Send + Sync>>>>
 }
 
 // Constructors for Tensor
@@ -28,21 +28,21 @@ impl Tensor {
             data: Arc::new(Mutex::new(data)),
             gradient: Arc::new(Mutex::new(grad)),
             _children: vec![],
-            _backward: Arc::new(Mutex::new(None)),
+            _backward: Arc::new(Mutex::new(None as Option<Box<dyn Fn() + Send + Sync>>)),
         }
     }   
 
     fn _internal_new(
         data: ArrayD<f32>,
         children: Vec<Tensor>,
-        backward_op: Box<dyn Fn()>,
+        backward_op: Box<dyn Fn() + Send + Sync>,
     ) -> Self {
         let grad = ArrayD::zeros(data.shape());
         Self {
             data: Arc::new(Mutex::new(data)),
             gradient: Arc::new(Mutex::new(grad)),
             _children: children,
-            _backward: Arc::new(Mutex::new(Some(backward_op))),
+            _backward: Arc::new(Mutex::new(Some((backward_op) as Box<dyn Fn() + Send + Sync>))), 
         }
     }
 }
@@ -109,7 +109,7 @@ pub fn add(&self, rhs: &Tensor) -> Tensor {
         data: Arc::new(Mutex::new(result_data.to_owned())),
         gradient: c_grad_rc,
         _children: vec![self.clone(), rhs.clone()],
-        _backward: Arc::new(Mutex::new(Some(Box::new(backward_op)))),
+        _backward: Arc::new(Mutex::new(Some(Box::new(backward_op) as Box<dyn Fn() + Send + Sync>))),
     }
 }
 
@@ -164,7 +164,7 @@ pub fn add(&self, rhs: &Tensor) -> Tensor {
             data: Arc::new(Mutex::new(result_data)),
             gradient: c_grad_rc,
             _children: vec![self.clone(), rhs.clone()],
-            _backward: Arc::new(Mutex::new(Some(Box::new(backward_op)))),
+            _backward: Arc::new(Mutex::new(Some(Box::new(backward_op) as Box<dyn Fn() + Send + Sync>))),
         }
     }
 
@@ -189,7 +189,7 @@ pub fn add(&self, rhs: &Tensor) -> Tensor {
             data: Arc::new(Mutex::new(result_data)),
             gradient: c_grad_rc,
             _children: vec![self.clone()], // Only one child
-            _backward: Arc::new(Mutex::new(Some(Box::new(backward_op)))),
+            _backward: Arc::new(Mutex::new(Some(Box::new(backward_op) as Box<dyn Fn() + Send + Sync>))),
         }
     }
 
@@ -226,7 +226,7 @@ pub fn add(&self, rhs: &Tensor) -> Tensor {
             data: Arc::new(Mutex::new(result_data.to_owned())),
             gradient: c_grad_rc,
             _children: vec![self.clone(), rhs.clone()],
-            _backward: Arc::new(Mutex::new(Some(Box::new(backward_op)))),
+            _backward: Arc::new(Mutex::new(Some(Box::new(backward_op) as Box<dyn Fn() + Send + Sync>))),
         }
     }
 
@@ -251,7 +251,7 @@ pub fn add(&self, rhs: &Tensor) -> Tensor {
             data: Arc::new(Mutex::new(result_data)),
             gradient: c_grad_rc,
             _children: vec![self.clone()],
-            _backward: Arc::new(Mutex::new(Some(Box::new(backward_op)))),
+            _backward: Arc::new(Mutex::new(Some(Box::new(backward_op) as Box<dyn Fn() + Send + Sync>))),
         }
     }
     pub fn mean(&self) -> Tensor {
@@ -279,7 +279,7 @@ pub fn add(&self, rhs: &Tensor) -> Tensor {
             data: Arc::new(Mutex::new(result_data)),
             gradient: c_grad_rc,
             _children: vec![self.clone()],
-            _backward: Arc::new(Mutex::new(Some(Box::new(backward_op)))),
+            _backward: Arc::new(Mutex::new(Some(Box::new(backward_op) as Box<dyn Fn() + Send + Sync>))),
         }
     }
 }

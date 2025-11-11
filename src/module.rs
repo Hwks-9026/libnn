@@ -1,6 +1,6 @@
 use crate::tensor::Tensor;
 
-pub trait Module {
+pub trait Module: Send + Sync {
 
     //perform forward pass
     fn forward(&self, input: &Tensor) -> Tensor;
