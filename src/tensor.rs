@@ -51,7 +51,14 @@ impl Tensor {
 // Math Operations
 impl Tensor {
     pub fn add(self, rhs: & Tensor) -> Tensor {
-        let result_data = &*self.data.borrow() + &*rhs.data.borrow();
+        let self_data = self.data.borrow();
+        let rhs_data = rhs.data.borrow();
+        
+        println!("--- ADDING ---");
+        dbg!(self_data.shape());
+        dbg!(rhs_data.shape());
+        
+        let result_data = &*self_data + &*rhs_data;
         
         let self_grad_rc = self.gradient.clone();
         let rhs_grad_rc = rhs.gradient.clone();
@@ -72,7 +79,14 @@ impl Tensor {
     }
 
     pub fn sub(self, rhs: &Tensor) -> Tensor {
-        let result_data = &*self.data.borrow() - &*rhs.data.borrow();
+        let self_data = self.data.borrow();
+        let rhs_data = rhs.data.borrow();
+        
+        println!("--- SUBTRACTING ---");
+        dbg!(self_data.shape());
+        dbg!(rhs_data.shape());
+        
+        let result_data = &*self_data - &*rhs_data;
         
         let self_grad_rc = self.gradient.clone();
         let rhs_grad_rc = rhs.gradient.clone();
