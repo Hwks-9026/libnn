@@ -127,7 +127,7 @@ pub fn add(&self, rhs: &Tensor) -> Tensor {
         let backward_op = move || {
             let c_grad = c_grad_rc_clone.lock().unwrap();
             self_grad_rc.lock().unwrap().scaled_add(1.0, &*c_grad);
-            rhs_grad_rc.lock().unwrap().scaled_add(1.0, &*c_grad);
+            rhs_grad_rc.lock().unwrap().scaled_add(-1.0, &*c_grad);
         };
         Tensor {
             data: Arc::new(Mutex::new(result_data)),
