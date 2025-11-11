@@ -1,4 +1,4 @@
-use ndarray::ArrayD;
+use ndarray::{ArrayD, Axis, IxDyn};
 use ndarray::arr0;
 use ndarray::linalg::Dot;
 use std::cell::RefCell;
@@ -50,34 +50,74 @@ impl Tensor {
 
 // Math Operations
 impl Tensor {
-    pub fn add(self, rhs: & Tensor) -> Tensor {
-        let self_data = self.data.borrow();
-        let rhs_data = rhs.data.borrow();
-        
-        println!("--- ADDING ---");
-        dbg!(self_data.shape());
-        dbg!(rhs_data.shape());
-        
-        let result_data = &*self_data + &*rhs_data;
-        println!("--- SUCEEDED ---");
-        
-        let self_grad_rc = self.gradient.clone();
-        let rhs_grad_rc = rhs.gradient.clone();
-        let c_grad_rc = Rc::new(RefCell::new(ArrayD::zeros(result_data.shape())));
-        
-        let c_grad_rc_clone = c_grad_rc.clone(); // Clone for the closure
-        let backward_op = move || {
-            let c_grad = c_grad_rc_clone.borrow();
+pub fn add(&self, rhs: &Tensor) -> Tensor {
+    // 1. FORWARD PASS
+    let self_data = self.data.borrow();
+    let rhs_data = rhs.data.borrow();
+
+    println!("--- ADDING ---");
+    dbg!(self_data.shape());
+    dbg!(rhs_data.shape());
+
+    let result_data = &*self_data + &*rhs_data;
+    println!("--- SUCEEDED ---");
+
+    // 2. PREPARE FOR BACKWARD PASS
+    let self_grad_rc = self.gradient.clone();
+    let rhs_grad_rc = rhs.gradient.clone();
+    
+    // We need the original shapes to detect broadcasting
+    let self_shape = self_data.shape().to_vec();
+    let rhs_shape = rhs_data.shape().to_vec();
+
+    let c_grad_rc = Rc::new(RefCell::new(ArrayD::zeros(result_data.shape())));
+
+    let c_grad_rc_clone = c_grad_rc.clone();
+    let backward_op = move || {
+        let c_grad = c_grad_rc_clone.borrow(); // This is [30, 4]
+
+        // --- Grad for self (matmul result) ---
+        // self_shape is [30, 4], c_grad is [30, 4]. Shapes match.
+        if self_shape == c_grad.shape() {
             self_grad_rc.borrow_mut().scaled_add(1.0, &*c_grad);
-            rhs_grad_rc.borrow_mut().scaled_add(1.0, &*c_grad);
-        };
-        Tensor {
-            data: Rc::new(RefCell::new(result_data)),
-            gradient: c_grad_rc, // Assign the grad Rc
-            _children: vec![self.clone(), rhs.clone()],
-            _backward: Rc::new(RefCell::new(Some(Box::new(backward_op)))),
+        } else {
+            // Handle if 'self' was broadcasted (not our case, but good to have)
+            let mut summed_grad = c_grad.clone();
+            let axes_to_sum: Vec<_> = self_shape.iter().zip(c_grad.shape())
+                .enumerate().filter(|(_, (a, b))| a < b).map(|(i, _)| i).collect();
+            for &axis in axes_to_sum.iter().rev() {
+                summed_grad = summed_grad.sum_axis(Axis(axis)).into_dyn();
+            }
+            let reshaped_grad = summed_grad.to_shape(IxDyn(&self_shape)).unwrap();
+            self_grad_rc.borrow_mut().scaled_add(1.0, &reshaped_grad);
         }
+
+        // --- Grad for rhs (bias) ---
+        // rhs_shape is [1, 4], c_grad is [30, 4]. Shapes DON'T match.
+        if rhs_shape == c_grad.shape() {
+            rhs_grad_rc.borrow_mut().scaled_add(1.0, &*c_grad);
+        } else {
+            // THIS IS OUR FIX:
+            // We sum the [30, 4] gradient along Axis(0)
+            let summed_grad = c_grad.sum_axis(Axis(0)).into_dyn(); // Shape [4]
+
+            // We reshape it from [4] to [1, 4] to match the bias's shape
+            let reshaped_grad = summed_grad.to_shape(IxDyn(&rhs_shape)).unwrap();
+            
+            // Add the summed, reshaped gradient
+            rhs_grad_rc.borrow_mut().scaled_add(1.0, &reshaped_grad);
+        }
+    };
+
+    // 3. CREATE NEW TENSOR
+    // We need .to_owned() because the result of `+` is a view
+    Tensor {
+        data: Rc::new(RefCell::new(result_data.to_owned())),
+        gradient: c_grad_rc,
+        _children: vec![self.clone(), rhs.clone()],
+        _backward: Rc::new(RefCell::new(Some(Box::new(backward_op)))),
     }
+}
 
     pub fn sub(self, rhs: &Tensor) -> Tensor {
         let self_data = self.data.borrow();
